@@ -69,6 +69,32 @@ fn main() {
         }).run();
 }
 
+fn jack() {
+    // 1. open a client
+    let (client, _status) =
+        jack::Client::new("jack_meter", jack::ClientOptions::NO_START_SERVER).unwrap();
+
+    let in_port = client
+        .register_port("meter_in", jack::AudioIn::default())
+        .unwrap();
+
+    let process = jack::ClosureProcessHandler::new(
+        move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
+            let in_p = in_port.as_slice(ps);
+
+            // Write output
+            for val in in_p {
+                value.store(*val, Ordering::Relaxed);
+            }
+
+            // Continue as normal
+            jack::Control::Continue
+        },
+    );
+
+    // 4. Activate the client. Also connect the ports to the system audio.
+    let _active_client = client.activate_async((), process).unwrap();
+}
 
 /// Attempt to read a frequency from standard in. Will block until there is
 /// user input. `None` is returned if there was an error reading from standard
