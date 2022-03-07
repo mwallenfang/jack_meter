@@ -52,7 +52,6 @@ impl<L: Lens<Target=f32>> View for MeterBar<L> {
         let pos_x = cx.cache.get_posx(cx.current);
         let pos_y = cx.cache.get_posy(cx.current);
         let value = *self.lens.get(cx);
-        println!("{}, {}, {}, {}, {}, {:?}", width, height, pos_x, pos_y, value, self.direction);
 
         let back_color: femColor = cx.style.background_color
             .get(cx.current).cloned().unwrap_or_default().into();
@@ -111,11 +110,14 @@ impl<L: Lens<Target=f32>> View for MeterBar<L> {
         canvas.fill_path(&mut back_path, back_paint);
 
         // Draw the front path
-        let mut front_path = Path::new();
-        front_path.rect(front_x, front_y, front_w, front_h);
+        if value >= 1e-3 {
+            let mut front_path = Path::new();
+            front_path.rect(front_x, front_y, front_w, front_h);
 
-        let mut front_paint = Paint::color(front_color);
+            let mut front_paint = Paint::color(front_color);
 
-        canvas.fill_path(&mut front_path, front_paint);
+            canvas.fill_path(&mut front_path, front_paint);
+        }
+
     }
 }

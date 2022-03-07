@@ -5,14 +5,18 @@ use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use atomic_float::AtomicF32;
 use vizia::*;
+use jack;
 use crate::meter::{Direction, MeterBar};
+use std::collections::VecDeque;
 
-static value: AtomicF32 = AtomicF32::new(0.2);
+static POS: AtomicF32 = AtomicF32::new(0.2);
+static sent_value: AtomicF32 = AtomicF32::new(0.0);
 
 #[derive(Lens)]
 pub struct Data {
     pos: f32,
-    buffer: [f32; 128]
+    buffer: VecDeque<f32>,
+    buffer_size: i32
 }
 
 impl Model for Data {
@@ -20,8 +24,13 @@ impl Model for Data {
         if let Some(gain_event) = event.message.downcast() {
             match gain_event {
                 Events::Yes(n) => {
-                    self.pos = *n;
-                    value.store(*n, Ordering::Relaxed);
+                    self.buffer.push_front(*n);
+                    if self.buffer.len() > self.buffer_size as usize {
+                        self.buffer.pop_back();
+                    }
+                    let new_pos = self.buffer.iter().sum::<f32>() / self.buffer_size as f32;
+                    self.pos = new_pos;
+                    POS.store(new_pos, Ordering::Relaxed);
                 }
             }
         }
@@ -33,16 +42,33 @@ enum Events {
 }
 
 fn main() {
-    thread::spawn(|| {
-        loop {
-            if let Some(n) = read_freq() {
-                value.store(n, Ordering::Relaxed);
+    // 1. open a client
+    let (client, _status) =
+        jack::Client::new("jack_meter", jack::ClientOptions::NO_START_SERVER).unwrap();
+
+    let in_port = client
+        .register_port("meter_in", jack::AudioIn::default())
+        .unwrap();
+
+    let process = jack::ClosureProcessHandler::new(
+        move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
+            let in_p = in_port.as_slice(ps);
+
+            // Write output
+            for val in in_p {
+                sent_value.store((*val).abs(), Ordering::Relaxed);
             }
-        }
-    });
+
+            // Continue as normal
+            jack::Control::Continue
+        },
+    );
+
+    // 4. Activate the client. Also connect the ports to the system audio.
+    let _active_client = client.activate_async((), process).unwrap();
 
     Application::new(WindowDescription::new().with_inner_size(100,500), |cx| {
-        Data{pos: 0.2, buffer: [0.0;128]}.build(cx);
+        Data{pos: 0.2, buffer: VecDeque::new(), buffer_size: 128}.build(cx);
         VStack::new(cx, |cx| {
             Label::new(cx, Data::pos);
             MeterBar::new(cx, Data::pos, Direction::DownToUp)
@@ -65,36 +91,10 @@ fn main() {
 
     })
         .on_idle(|cx| {
-            cx.emit(Events::Yes(value.load(Ordering::Relaxed)));
+            cx.emit(Events::Yes(sent_value.load(Ordering::Relaxed)));
         }).run();
 }
 
-fn jack() {
-    // 1. open a client
-    let (client, _status) =
-        jack::Client::new("jack_meter", jack::ClientOptions::NO_START_SERVER).unwrap();
-
-    let in_port = client
-        .register_port("meter_in", jack::AudioIn::default())
-        .unwrap();
-
-    let process = jack::ClosureProcessHandler::new(
-        move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
-            let in_p = in_port.as_slice(ps);
-
-            // Write output
-            for val in in_p {
-                value.store(*val, Ordering::Relaxed);
-            }
-
-            // Continue as normal
-            jack::Control::Continue
-        },
-    );
-
-    // 4. Activate the client. Also connect the ports to the system audio.
-    let _active_client = client.activate_async((), process).unwrap();
-}
 
 /// Attempt to read a frequency from standard in. Will block until there is
 /// user input. `None` is returned if there was an error reading from standard
