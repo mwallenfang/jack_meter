@@ -84,7 +84,8 @@ impl View for MeterBar {
         let pos_y = cx.cache.get_posy(cx.current);
         let value = self.value;
 
-        let bar_color = femColor::rgb(255, 0, 0);
+        let bar_color =
+            cx.style.background_color.get(cx.current).cloned().unwrap_or_default().into();
 
         // Create variables for the rectangle
         let front_x;
