@@ -21,14 +21,14 @@ pub enum Direction {
     RightToLeft,
 }
 
-pub struct MeterBar<L> {
+pub struct Meter<L> {
     /// The position of the meter in [0,1]
     lens: L,
     /// The directions the meter's ends are pointing in
     direction: Direction
 }
 
-impl<L: Lens<Target=f32>> MeterBar<L> {
+impl<L:Lens<Target = f32>> Meter<L> {
     pub fn new(
         cx: &mut Context,
         lens: L,
@@ -37,11 +37,42 @@ impl<L: Lens<Target=f32>> MeterBar<L> {
         Self {
             lens: lens.clone(),
             direction
+        }.build2(cx, move |cx| {
+            ZStack::new(cx, move |cx| {
+                MeterBar::new(cx, direction)
+                    .value(lens);
+            });
+        })
+    }
+}
+
+impl<L:Lens<Target = f32>> View for Meter<L> {
+    fn element(&self) -> Option<String> {
+        Some("meter".to_string())
+    }
+
+}
+
+pub struct MeterBar {
+    /// The value to show on the meter in [0,1]
+    value: f32,
+    /// The directions the meter's ends are pointing in
+    direction: Direction
+}
+
+impl MeterBar {
+    pub fn new(
+        cx: &mut Context,
+        direction: Direction
+    ) -> Handle<Self> {
+        Self {
+            value: 0.0,
+            direction
         }.build(cx)
     }
 }
 
-impl<L: Lens<Target=f32>> View for MeterBar<L> {
+impl View for MeterBar {
     fn element(&self) -> Option<String> {
         Some("meter_bar".to_string())
     }
@@ -51,18 +82,11 @@ impl<L: Lens<Target=f32>> View for MeterBar<L> {
         let height = cx.cache.get_height(cx.current);
         let pos_x = cx.cache.get_posx(cx.current);
         let pos_y = cx.cache.get_posy(cx.current);
-        let value = *self.lens.get(cx);
+        let value = self.value;
 
-        let back_color: femColor = cx.style.background_color
-            .get(cx.current).cloned().unwrap_or_default().into();
-        let front_color = femColor::rgb(255,0,0);
+        let bar_color = femColor::rgb(255, 0, 0);
 
-        // Create variables for the rectangle corners
-        let back_x = pos_x;
-        let back_y = pos_y;
-        let back_w = width;
-        let back_h = height;
-
+        // Create variables for the rectangle
         let front_x;
         let front_y;
         let front_w;
@@ -101,23 +125,38 @@ impl<L: Lens<Target=f32>> View for MeterBar<L> {
             }
         };
 
-        // Draw the back path
-        let mut back_path = Path::new();
-        back_path.rect(back_x, back_y, back_w, back_h);
 
-        let mut back_paint = Paint::color(back_color);
-
-        canvas.fill_path(&mut back_path, back_paint);
-
-        // Draw the front path
+        // Draw the bar
         if value >= 1e-3 {
             let mut front_path = Path::new();
             front_path.rect(front_x, front_y, front_w, front_h);
 
-            let mut front_paint = Paint::color(front_color);
+            let mut front_paint = Paint::color(bar_color);
 
             canvas.fill_path(&mut front_path, front_paint);
         }
+    }
+}
 
+pub trait MeterBarHandle {
+    fn value<L: Lens<Target = f32>>(self, lens: L) -> Self
+        where L: Lens<Target = f32> ;
+}
+
+impl MeterBarHandle for Handle<'_, MeterBar> {
+    fn value<L: Lens<Target = f32>>(self, lens: L) -> Self {
+        let entity = self.entity;
+        Binding::new(self.cx, lens, move |cx, value| {
+            let value = *value.get(cx);
+
+            if let Some(view) = cx.views.get_mut(&entity) {
+                if let Some(bar) = view.downcast_mut::<MeterBar>() {
+                    bar.value = value;
+                    cx.style.needs_redraw = true;
+                }
+            }
+        });
+
+        self
     }
 }
