@@ -89,7 +89,7 @@ impl<L: Lens<Target = f32>> Meter<L> {
             .build(cx);
 
             Binding::new(cx, lens, |cx, value| {
-                cx.emit(MeterEvents::UpdatePosition(*value.get(cx)));
+                cx.emit(MeterEvents::UpdatePosition(value.get(cx)));
             });
             ZStack::new(cx, |cx| {
                 MeterBar::new(cx)
@@ -126,7 +126,7 @@ pub trait MeterHandle {
 impl<T> MeterHandle for Handle<'_, Meter<T>> {
     fn peak_drop_speed<L: Lens<Target = f32>>(self, lens: L) -> Self {
         Binding::new(self.cx, lens, move |cx, value| {
-            let value = *value.get(cx);
+            let value = value.get(cx);
             println!("A");
             cx.emit(MeterEvents::ChangePeakDropSpeed(value));
         });
