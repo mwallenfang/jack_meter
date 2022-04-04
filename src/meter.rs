@@ -1,9 +1,4 @@
-use std::collections::VecDeque;
 use vizia::*;
-use vizia::Color as vizColor;
-use femtovg::{Paint, Path, LineCap, Solidity};
-use femtovg::Color as femColor;
-use itertools::cloned;
 
 /// The direction the meter bar shows the peak in.
 /// The semantic is LowToHigh, so DownToUp is the standard vertical meter design
@@ -21,143 +16,151 @@ pub enum Direction {
     RightToLeft,
 }
 
+#[derive(Lens)]
+pub struct MeterData {
+    pos: f32,
+    max: f32,
+    max_delay_ticker: i32,
+    max_drop_speed: f32,
+    smoothing_factor: f32,
+}
+
+impl Model for MeterData {
+    fn event(&mut self, _cx: &mut Context, event: &mut Event) {
+        if let Some(param_change_event) = event.message.downcast() {
+            match param_change_event {
+                MeterEvents::UpdatePosition(n) => {
+                    self.pos = self.pos - self.smoothing_factor * (self.pos - (*n).abs());
+
+                    if self.max < self.pos {
+                        self.max = self.pos;
+                        self.max_delay_ticker = 50;
+                    }
+                    if self.max_delay_ticker == 0 {
+                        self.max -= self.max_drop_speed;
+
+                        if self.max < 0.0 {
+                            self.max = 0.0;
+                        }
+                    } else {
+                        self.max_delay_ticker -= 1;
+                    }
+                }
+                MeterEvents::ChangePeakDropSpeed(n) => {
+                    println!("B");
+                    self.max_drop_speed = *n;
+                }
+            }
+        }
+    }
+}
+
+pub enum MeterEvents {
+    UpdatePosition(f32),
+    ChangePeakDropSpeed(f32),
+}
+
 pub struct Meter<L> {
     /// The position of the meter in [0,1]
     lens: L,
     /// The directions the meter's ends are pointing in
-    direction: Direction
+    direction: Direction,
 }
 
-impl<L:Lens<Target = f32>> Meter<L> {
+impl<L: Lens<Target = f32>> Meter<L> {
     pub fn new(
         cx: &mut Context,
         lens: L,
-        direction: Direction
+        direction: Direction,
+        smoothing_factor: f32,
     ) -> Handle<Self> {
         Self {
             lens: lens.clone(),
-            direction
-        }.build2(cx, move |cx| {
-            ZStack::new(cx, move |cx| {
-                MeterBar::new(cx, direction)
-                    .value(lens);
+            direction,
+        }
+        .build2(cx, move |cx| {
+            MeterData {
+                pos: 0.1,
+                max: 0.0,
+                max_delay_ticker: 0,
+                max_drop_speed: 0.0,
+                smoothing_factor,
+            }
+            .build(cx);
+
+            Binding::new(cx, lens, |cx, value| {
+                cx.emit(MeterEvents::UpdatePosition(*value.get(cx)));
+            });
+            ZStack::new(cx, |cx| {
+                MeterBar::new(cx)
+                    .height(MeterData::pos.map(|val| Percentage(val * 100.0)))
+                    .top(Stretch(1.0))
+                    .width(Stretch(1.0))
+                    .background_color(Color::red());
+
+                MeterLine::new(cx)
+                    .width(Stretch(1.0))
+                    .height(Pixels(2.0))
+                    .top(Stretch(1.0))
+                    .bottom(MeterData::max.map(|val| Percentage(val * 100.0)))
+                    .background_color(Color::black());
             });
         })
     }
 }
 
-impl<L:Lens<Target = f32>> View for Meter<L> {
+impl<L: Lens<Target = f32>> View for Meter<L> {
     fn element(&self) -> Option<String> {
         Some("meter".to_string())
     }
-
 }
 
-pub struct MeterBar {
-    /// The value to show on the meter in [0,1]
-    value: f32,
-    /// The directions the meter's ends are pointing in
-    direction: Direction
+pub trait MeterHandle {
+    fn peak_drop_speed<L: Lens<Target = f32>>(self, lens: L) -> Self
+    where
+        L: Lens<Target = f32>;
+
+    fn peak_drop_speed_const(self, val: f32) -> Self;
 }
 
-impl MeterBar {
-    pub fn new(
-        cx: &mut Context,
-        direction: Direction
-    ) -> Handle<Self> {
-        Self {
-            value: 0.0,
-            direction
-        }.build(cx)
-    }
-}
-
-impl View for MeterBar {
-    fn element(&self) -> Option<String> {
-        Some("meter_bar".to_string())
-    }
-
-    fn draw(&self, cx: &mut Context, canvas: &mut Canvas) {
-        let width = cx.cache.get_width(cx.current);
-        let height = cx.cache.get_height(cx.current);
-        let pos_x = cx.cache.get_posx(cx.current);
-        let pos_y = cx.cache.get_posy(cx.current);
-        let value = self.value;
-
-        let bar_color =
-            cx.style.background_color.get(cx.current).cloned().unwrap_or_default().into();
-
-        // Create variables for the rectangle
-        let front_x;
-        let front_y;
-        let front_w;
-        let front_h;
-
-        // Build the start and end positions of the back and front line
-        // according to the direction the meter is going and the value the meter is showing
-        match self.direction {
-            Direction::DownToUp => {
-                front_x = pos_x;
-                front_y = pos_y + (1.0-value) * height;
-
-                front_w = width;
-                front_h = value * height;
-            },
-            Direction::UpToDown => {
-                front_x = pos_x;
-                front_y = pos_y;
-
-                front_w = width;
-                front_h = value * height;
-            },
-            Direction::LeftToRight => {
-                front_x = pos_x;
-                front_y = pos_y;
-
-                front_w = value * width;
-                front_h = height;
-            },
-            Direction::RightToLeft => {
-                front_x = pos_x + (1.0-value) * width;
-                front_y = pos_y;
-
-                front_w = value * width;
-                front_h = height;
-            }
-        };
-
-
-        // Draw the bar
-        if value >= 1e-3 {
-            let mut front_path = Path::new();
-            front_path.rect(front_x, front_y, front_w, front_h);
-
-            let mut front_paint = Paint::color(bar_color);
-
-            canvas.fill_path(&mut front_path, front_paint);
-        }
-    }
-}
-
-pub trait MeterBarHandle {
-    fn value<L: Lens<Target = f32>>(self, lens: L) -> Self
-        where L: Lens<Target = f32> ;
-}
-
-impl MeterBarHandle for Handle<'_, MeterBar> {
-    fn value<L: Lens<Target = f32>>(self, lens: L) -> Self {
-        let entity = self.entity;
+impl<T> MeterHandle for Handle<'_, Meter<T>> {
+    fn peak_drop_speed<L: Lens<Target = f32>>(self, lens: L) -> Self {
         Binding::new(self.cx, lens, move |cx, value| {
             let value = *value.get(cx);
-
-            if let Some(view) = cx.views.get_mut(&entity) {
-                if let Some(bar) = view.downcast_mut::<MeterBar>() {
-                    bar.value = value;
-                    cx.style.needs_redraw = true;
-                }
-            }
+            println!("A");
+            cx.emit(MeterEvents::ChangePeakDropSpeed(value));
         });
 
         self
+    }
+
+    fn peak_drop_speed_const(self, val: f32) -> Self {
+        self.cx.emit(MeterEvents::ChangePeakDropSpeed(val));
+        println!("A");
+        self
+    }
+}
+
+pub struct MeterBar {}
+
+impl MeterBar {
+    pub fn new(cx: &mut Context) -> Handle<Self> {
+        Self {}.build(cx)
+    }
+}
+
+impl View for MeterBar {}
+
+pub struct MeterLine {}
+
+impl MeterLine {
+    pub fn new(cx: &mut Context) -> Handle<Self> {
+        Self {}.build(cx)
+    }
+}
+
+impl View for MeterLine {
+    fn element(&self) -> Option<String> {
+        Some("meter_line".to_string())
     }
 }
