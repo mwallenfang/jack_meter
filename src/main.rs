@@ -1,4 +1,5 @@
 mod meter;
+mod meter_new;
 
 use crate::meter::{Direction, Meter, MeterHandle};
 use atomic_float::AtomicF32;
@@ -17,7 +18,7 @@ pub struct Data {
 }
 
 impl Model for Data {
-    fn event(&mut self, cx: &mut Context, event: &mut Event) {
+    fn event(&mut self, _cx: &mut Context, event: &mut Event) {
         if let Some(gain_event) = event.message.downcast() {
             match gain_event {
                 Events::UpdateValue(n) => {
@@ -68,12 +69,11 @@ fn main() {
         .build(cx);
         VStack::new(cx, |cx| {
             Label::new(cx, Data::input);
-            Meter::new(cx, Data::input, Direction::DownToUp, 0.2)
-                // .peak_drop_speed(Data::drop_speed)
-                .peak_drop_speed_const(0.002)
+            Meter::new(cx, Data::input, Direction::DownToUp)
+                .smoothing_factor(0.1)
+                .peak_drop_speed(0.005)
                 .left(Stretch(1.0))
-                .right(Stretch(1.0))
-                .background_color(Color::green());
+                .right(Stretch(1.0));
         });
     })
     .on_idle(|cx| {

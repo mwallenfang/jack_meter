@@ -1718,7 +1718,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vizia"
 version = "0.1.0"
-source = "git+https://github.com/vizia/vizia#0261a76fb59dc156e802c34507f5c6442480fd9b"
+source = "git+https://github.com/vizia/vizia#c83feca86315661f27fbda9e3dda48f2b39f5cf3"
 dependencies = [
  "vizia_core",
  "vizia_winit",
@@ -1727,7 +1727,7 @@ dependencies = [
 [[package]]
 name = "vizia_core"
 version = "0.1.0"
-source = "git+https://github.com/vizia/vizia#0261a76fb59dc156e802c34507f5c6442480fd9b"
+source = "git+https://github.com/vizia/vizia#c83feca86315661f27fbda9e3dda48f2b39f5cf3"
 dependencies = [
  "bitflags",
  "copypasta",
@@ -1751,7 +1751,7 @@ dependencies = [
 [[package]]
 name = "vizia_derive"
 version = "0.1.0"
-source = "git+https://github.com/vizia/vizia#0261a76fb59dc156e802c34507f5c6442480fd9b"
+source = "git+https://github.com/vizia/vizia#c83feca86315661f27fbda9e3dda48f2b39f5cf3"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
@@ -1761,7 +1761,7 @@ dependencies = [
 [[package]]
 name = "vizia_winit"
 version = "0.1.0"
-source = "git+https://github.com/vizia/vizia#0261a76fb59dc156e802c34507f5c6442480fd9b"
+source = "git+https://github.com/vizia/vizia#c83feca86315661f27fbda9e3dda48f2b39f5cf3"
 dependencies = [
  "console_error_panic_hook",
  "femtovg 0.3.3 (git+https://github.com/femtovg/femtovg?rev=87fe627794f3f793d8e3a338c838a2f8e8a8aa9d)",
