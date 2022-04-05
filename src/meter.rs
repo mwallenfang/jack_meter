@@ -75,38 +75,6 @@ pub struct Meter {
     smoothing_factor: f32,
 }
 
-impl Model for Meter {
-    fn event(&mut self, _cx: &mut Context, event: &mut Event) {
-        if let Some(param_change_event) = event.message.downcast() {
-            match param_change_event {
-                MeterEvents::UpdatePosition(n) => {
-                    self.pos = self.pos - self.smoothing_factor * (self.pos - (*n).abs());
-
-                    if self.max < self.pos {
-                        self.max = self.pos;
-                        self.max_delay_ticker = 50;
-                    }
-                    if self.max_delay_ticker == 0 {
-                        self.max -= self.max_drop_speed;
-
-                        if self.max < 0.0 {
-                            self.max = 0.0;
-                        }
-                    } else {
-                        self.max_delay_ticker -= 1;
-                    }
-                }
-                MeterEvents::ChangePeakDropSpeed(n) => {
-                    self.max_drop_speed = *n;
-                }
-                MeterEvents::ChangeSmoothingFactor(n) => {
-                    self.smoothing_factor = *n;
-                }
-            }
-        }
-    }
-}
-
 impl Meter {
     pub fn new<L: Lens<Target = f32>>(cx: &mut Context, lens: L, direction: Direction) -> Handle<Self> {
         vizia::View::build(Self {
@@ -200,6 +168,36 @@ impl Meter {
 impl View for Meter {
     fn element(&self) -> Option<String> {
         Some("meter".to_string())
+    }
+
+    fn event(&mut self, _cx: &mut Context, event: &mut Event) {
+        if let Some(param_change_event) = event.message.downcast() {
+            match param_change_event {
+                MeterEvents::UpdatePosition(n) => {
+                    self.pos = self.pos - self.smoothing_factor * (self.pos - (*n).abs());
+
+                    if self.max < self.pos {
+                        self.max = self.pos;
+                        self.max_delay_ticker = 50;
+                    }
+                    if self.max_delay_ticker == 0 {
+                        self.max -= self.max_drop_speed;
+
+                        if self.max < 0.0 {
+                            self.max = 0.0;
+                        }
+                    } else {
+                        self.max_delay_ticker -= 1;
+                    }
+                }
+                MeterEvents::ChangePeakDropSpeed(n) => {
+                    self.max_drop_speed = *n;
+                }
+                MeterEvents::ChangeSmoothingFactor(n) => {
+                    self.smoothing_factor = *n;
+                }
+            }
+        }
     }
 }
 
