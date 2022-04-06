@@ -1,7 +1,7 @@
 mod meter;
 mod meter_new;
 
-use crate::meter::{Direction, Meter, MeterHandle};
+use crate::meter_new::{Direction, Meter, MeterHandle};
 use atomic_float::AtomicF32;
 use jack;
 use std::sync::atomic::Ordering;
@@ -15,6 +15,7 @@ const STYLE: &str = include_str!("style.css");
 pub struct Data {
     input: f32,
     drop_speed: f32,
+    col: String
 }
 
 impl Model for Data {
@@ -65,6 +66,7 @@ fn main() {
         Data {
             input: 0.0,
             drop_speed: 0.1,
+            col: String::from("#ffff00")
         }
         .build(cx);
         VStack::new(cx, |cx| {
@@ -72,6 +74,7 @@ fn main() {
             Meter::new(cx, Data::input, Direction::DownToUp)
                 .smoothing_factor(0.1)
                 .peak_drop_speed(0.005)
+                .bar_color(Data::col)
                 .left(Stretch(1.0))
                 .right(Stretch(1.0));
         });
