@@ -73,7 +73,8 @@ fn main() {
             Label::new(cx, Data::input);
             Meter::new(cx, Data::input, Direction::DownToUp)
                 .smoothing_factor(0.1)
-                .peak_drop_speed(0.005)
+                .peak_drop_speed(0.006)
+                .max_hold_time(20)
                 .bar_color(Data::col)
                 .left(Stretch(1.0))
                 .right(Stretch(1.0));

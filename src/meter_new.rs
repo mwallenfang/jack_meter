@@ -24,6 +24,7 @@ pub enum MeterEvents {
     UpdatePosition(f32),
     ChangePeakDropSpeed(f32),
     ChangeSmoothingFactor(f32),
+    ChangeMaxHoldTime(i32),
     ChangeBarColor(String)
 }
 
@@ -33,6 +34,7 @@ pub struct Meter {
     max: f32,
     max_delay_ticker: i32,
     max_drop_speed: f32,
+    max_hold_time: i32,
     smoothing_factor: f32,
     direction: Direction,
     bar_color: String,
@@ -46,6 +48,7 @@ impl Meter {
             max: 0.0,
             max_delay_ticker: 0,
             max_drop_speed: 0.05,
+            max_hold_time: 50,
             smoothing_factor: 0.1,
             direction,
             bar_color: String::from("#ff0000"),
@@ -71,7 +74,7 @@ impl View for Meter {
 
                     if self.max < self.pos {
                         self.max = self.pos;
-                        self.max_delay_ticker = 50;
+                        self.max_delay_ticker = self.max_hold_time;
                     }
                     if self.max_delay_ticker == 0 {
                         self.max -= self.max_drop_speed;
@@ -89,9 +92,13 @@ impl View for Meter {
                 MeterEvents::ChangeSmoothingFactor(n) => {
                     self.smoothing_factor = *n;
                 }
+                MeterEvents::ChangeMaxHoldTime(n) => {
+                    self.max_hold_time = *n;
+                }
                 MeterEvents::ChangeBarColor(col) => {
                     self.bar_color = col.clone();
                 }
+                
             }
         }
     }
@@ -103,9 +110,6 @@ impl View for Meter {
         let pos_y = cx.cache.get_posy(cx.current);
         let value = self.pos;
         let max = self.max;
-
-        // let bar_color =
-        //     cx.style.background_color.get(cx.current).cloned().unwrap_or_default().into();
 
         // Create variables for the rectangle
         let front_x;
@@ -154,11 +158,11 @@ impl View for Meter {
                 front_w = value * width;
                 front_h = height;
 
-                line_x1 = pos_x;
-                line_x2 = pos_x + width;
+                line_x1 = pos_x + max * width;
+                line_x2 = pos_x + max * width;
 
-                line_y1 = pos_y + max * height;
-                line_y2 = line_y1;
+                line_y1 = pos_y;
+                line_y2 = pos_y + height;
             },
             Direction::RightToLeft => {
                 front_x = pos_x + (1.0-value) * width;
@@ -167,11 +171,11 @@ impl View for Meter {
                 front_w = value * width;
                 front_h = height;
 
-                line_x1 = pos_x;
-                line_x2 = pos_x + width;
+                line_x1 = pos_x + (1.0 - max) * width;
+                line_x2 = pos_x + (1.0 - max) * width;
 
-                line_y1 = pos_y + max * height;
-                line_y2 = line_y1;
+                line_y1 = pos_y;
+                line_y2 = pos_y + height;
             },
             _ => {
                 front_x = pos_x;
@@ -213,6 +217,7 @@ pub trait MeterHandle {
     fn peak_drop_speed(self, val: impl Res<f32>) -> Self;
     fn smoothing_factor(self, val: impl Res<f32>) -> Self;
     fn bar_color(self, val: impl Res<String>) -> Self;
+    fn max_hold_time(self, val: impl Res<i32>) -> Self;
 }
 
 impl MeterHandle for Handle<'_, Meter> {
@@ -235,6 +240,14 @@ impl MeterHandle for Handle<'_, Meter> {
     fn bar_color(self, val: impl Res<String>) -> Self {
         val.set_or_bind(self.cx, self.entity, |cx, entity, value| {
             entity.emit(cx, MeterEvents::ChangeBarColor(value));
+        });
+
+        self
+    }
+
+    fn max_hold_time(self, val: impl Res<i32>) -> Self {
+        val.set_or_bind(self.cx, self.entity, |cx, entity, value| {
+            entity.emit(cx, MeterEvents::ChangeMaxHoldTime(value));
         });
 
         self
