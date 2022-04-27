@@ -1,0 +1,11 @@
+meter {
+    background-color: #000000;
+}
+
+.meter_bar {
+    background-color: #ff0000;
+}
+
+.meter_line {
+    background-color: #ffffff;
+}

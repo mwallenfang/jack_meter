@@ -71,7 +71,7 @@ fn main() {
         .build(cx);
         VStack::new(cx, |cx| {
             Label::new(cx, Data::input);
-            Meter::new(cx, Data::input, Direction::DownToUp)
+            Meter::new(cx, Data::input, Direction::Up)
                 .smoothing_factor(0.1)
                 .peak_drop_speed(0.006)
                 .max_hold_time(20)
